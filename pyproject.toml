@@ -1,0 +1,9 @@
+[project]
+name = "flyconn"
+version = "0.1.0"
+description = "Graph analysis of the FlyWire adult Drosophila connectome"
+requires-python = ">=3.10"
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]

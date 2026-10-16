@@ -1,0 +1,9 @@
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+# raw data is downloaded by scripts/download_data.sh (~130 MB)
+data/raw/
+# large generated intermediates; figures, tables and the dashboard are kept
+outputs/dashboard_data.json
+outputs/fly-connectome-atlas.html

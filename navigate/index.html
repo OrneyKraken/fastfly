@@ -1,0 +1,479 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Fly Maze Runner</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: arena on the left (editor + live view), brain readout on the right. */
+:root {
+  --page: #f4f5f2; --surface: #fcfcfb; --ink: #0b0b0b; --ink-2: #52514e; --muted: #898781;
+  --grid: #e7e6e0; --axis: #c3c2b7; --ring: rgba(11,11,11,.10);
+  --wall: #3a3a37; --floor: #fcfcfb;
+  --left: #2a78d6; --right: #eb6834; --goal: #1baf7a; --trail: #2a78d6; --accent: #2a78d6;
+  --good: #0ca30c; --warn: #fab219; --bad: #d03b3b;
+  --font-display: "Bricolage Grotesque", system-ui, sans-serif;
+  --font-body: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --page: #0d0d0d; --surface: #1a1a19; --ink: #fff; --ink-2: #c3c2b7; --muted: #898781;
+    --grid: #262624; --axis: #383835; --ring: rgba(255,255,255,.10);
+    --wall: #c3c2b7; --floor: #1a1a19;
+    --left: #3987e5; --right: #d95926; --goal: #199e70; --trail: #3987e5; --accent: #3987e5;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --page: #0d0d0d; --surface: #1a1a19; --ink: #fff; --ink-2: #c3c2b7; --muted: #898781;
+  --grid: #262624; --axis: #383835; --ring: rgba(255,255,255,.10);
+  --wall: #c3c2b7; --floor: #1a1a19;
+  --left: #3987e5; --right: #d95926; --goal: #199e70; --trail: #3987e5; --accent: #3987e5;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--page); color: var(--ink); font: 14px/1.5 var(--font-body); padding-inline: 16px; padding-block: 0 32px; }
+.wrap { max-width: 1320px; margin: 0 auto; display: grid; gap: 16px; }
+header { display: flex; justify-content: space-between; align-items: end; gap: 12px; flex-wrap: wrap; padding-block: 18px 0; }
+h1 { font: 700 1.7rem/1.1 var(--font-display); margin: 0; letter-spacing: -0.01em; }
+h2 { font: 600 1rem/1.2 var(--font-display); margin: 0; }
+.sub { color: var(--ink-2); max-width: 70ch; margin: 4px 0 0; }
+.main { display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: 16px; align-items: start; }
+.card { background: var(--surface); border: 1px solid var(--ring); border-radius: 10px; padding: 14px; display: grid; gap: 12px; min-width: 0; }
+.toolbar { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; }
+.group { display: inline-flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.label { font-size: .75rem; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; font-family: var(--font-mono); }
+.seg { display: inline-flex; border: 1px solid var(--axis); border-radius: 8px; overflow: hidden; }
+.seg button { border: 0; background: transparent; color: var(--ink-2); padding: 5px 10px; font: 500 .82rem var(--font-body); cursor: pointer; }
+.seg button + button { border-left: 1px solid var(--axis); }
+.seg button[aria-pressed="true"] { background: var(--ink); color: var(--surface); }
+.btn, select, input[type=number] { font: 500 .82rem var(--font-body); border: 1px solid var(--axis); background: var(--surface); color: var(--ink); border-radius: 8px; padding: 5px 10px; }
+.btn { cursor: pointer; display: inline-block; }
+.btn:hover { border-color: var(--ink-2); }
+button.primary { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; padding: 8px 16px; font-size: .9rem; }
+button.primary.stop { background: var(--bad); border-color: var(--bad); }
+button:disabled { opacity: .5; cursor: not-allowed; }
+input[type=number] { width: 64px; }
+button:focus-visible, select:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.arena-box { position: relative; overflow: auto; }
+#arena { display: block; max-width: 100%; touch-action: none; cursor: crosshair; border-radius: 6px; }
+.hint { font-size: .8rem; color: var(--muted); }
+.status { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.pill { display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px; border-radius: 999px; font-weight: 600; font-size: .82rem; border: 1px solid var(--axis); }
+.pill::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--muted); }
+.pill[data-s="running"]::before { background: var(--accent); animation: pulse 1s infinite; }
+.pill[data-s="reached"]::before { background: var(--good); }
+.pill[data-s="timeout"]::before, .pill[data-s="stopped"]::before { background: var(--warn); }
+.pill[data-s="error"]::before { background: var(--bad); }
+@keyframes pulse { 50% { opacity: .3; } }
+@media (prefers-reduced-motion: reduce) { .pill::before { animation: none !important; } }
+.stats { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 14px; }
+.stat { display: grid; }
+.stat span:first-child { font-size: .75rem; color: var(--muted); }
+.stat span:last-child { font: 600 1.05rem var(--font-body); font-variant-numeric: tabular-nums; }
+.settings { display: grid; gap: 8px; }
+.row { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+.row label { color: var(--ink-2); }
+input[type=range] { width: 140px; accent-color: var(--accent); }
+.bars { display: grid; gap: 6px; }
+.bar { display: grid; grid-template-columns: 92px 1fr 1fr; gap: 6px; align-items: center; font-size: .78rem; }
+.bar .name { color: var(--ink-2); }
+.bar .name small { color: var(--muted); display: block; font-size: .7rem; line-height: 1.1; }
+.track { height: 16px; background: var(--grid); border-radius: 3px; position: relative; overflow: hidden; }
+.track i { position: absolute; top: 0; bottom: 0; border-radius: 3px; }
+.track.l i { right: 0; background: var(--left); }
+.track.r i { left: 0; background: var(--right); }
+.track b { position: absolute; top: 0; font: 500 .7rem/16px var(--font-mono); color: var(--ink); padding: 0 4px; }
+.track.l b { left: 0; } .track.r b { right: 0; }
+.lr-head { display: grid; grid-template-columns: 92px 1fr 1fr; gap: 6px; font-size: .72rem; color: var(--muted); }
+.lr-head span:nth-child(2) { text-align: right; }
+.legend-dot { display: inline-block; width: 8px; height: 8px; border-radius: 2px; margin-right: 4px; vertical-align: middle; }
+.steer { position: relative; height: 22px; background: var(--grid); border-radius: 4px; }
+.steer i { position: absolute; top: 3px; bottom: 3px; width: 3px; background: var(--ink); border-radius: 2px; left: 50%; transition: left .12s linear; }
+.steer span { position: absolute; top: 0; font-size: .7rem; line-height: 22px; color: var(--muted); }
+.flow { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; text-align: center; font-size: .72rem; color: var(--ink-2); }
+.flow div { border: 1px solid var(--grid); border-radius: 6px; padding: 4px; }
+.how { color: var(--ink-2); font-size: .85rem; display: grid; gap: 8px; }
+.how p { margin: 0; max-width: 75ch; }
+.mono { font-family: var(--font-mono); font-size: .8em; }
+#error { color: var(--bad); font-size: .8rem; }
+@media (max-width: 980px) { .main { grid-template-columns: minmax(0, 1fr); } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <h1>Fly Maze Runner</h1>
+      <p class="sub">Draw a map, then watch a virtual fruit fly find the goal. Its steering comes from a spiking simulation of the whole fly brain: all 138,639 neurons of the FlyWire connectome.</p>
+    </div>
+    <span class="hint" id="server-note">Connecting to the brain server…</span>
+  </header>
+
+  <div class="main">
+    <section class="card">
+      <div class="toolbar">
+        <div class="group"><span class="label">Draw</span>
+          <div class="seg" id="tools" role="group" aria-label="Drawing tool">
+            <button type="button" data-tool="wall" aria-pressed="true">Wall</button>
+            <button type="button" data-tool="erase">Erase</button>
+            <button type="button" data-tool="start">Start</button>
+            <button type="button" data-tool="goal">Goal</button>
+          </div>
+        </div>
+        <div class="group"><label class="label" for="heading">Start facing</label>
+          <select id="heading">
+            <option value="0">→ right</option><option value="90">↓ down</option>
+            <option value="180">← left</option><option value="270">↑ up</option>
+          </select>
+        </div>
+        <div class="group"><label class="label" for="preset">Map</label>
+          <select id="preset"></select>
+          <button class="btn" type="button" id="maze-btn">Random maze</button>
+          <button class="btn" type="button" id="clear-btn">Clear</button>
+        </div>
+        <div class="group"><span class="label">Size</span>
+          <input type="number" id="cols" min="8" max="80" aria-label="Columns"> ×
+          <input type="number" id="rows" min="6" max="80" aria-label="Rows">
+          <button class="btn" type="button" id="resize-btn">Resize</button>
+        </div>
+        <div class="group">
+          <button class="btn" type="button" id="export-btn">Save map</button>
+          <label class="btn" for="import-file" style="cursor:pointer">Load map</label>
+          <input type="file" id="import-file" accept=".json,application/json" hidden>
+        </div>
+      </div>
+      <div class="arena-box"><canvas id="arena" aria-label="Map editor and simulation view"></canvas></div>
+      <div class="hint" id="scale-note"></div>
+    </section>
+
+    <aside class="card">
+      <div class="status">
+        <button class="primary" type="button" id="run-btn" disabled>Run fly</button>
+        <span class="pill" id="status" data-s="idle">Ready</span>
+      </div>
+      <div id="error" hidden></div>
+      <div class="stats">
+        <div class="stat"><span>Simulated time</span><span id="st-time">0.0 s</span></div>
+        <div class="stat"><span>Distance to goal</span><span id="st-dist">–</span></div>
+        <div class="stat"><span>Neurons active</span><span id="st-active">–</span></div>
+        <div class="stat"><span>Speed vs. real time</span><span id="st-ratio">–</span></div>
+      </div>
+
+      <h2>Eyes → brain → legs</h2>
+      <div class="flow"><div>Eyes<br><b>LC10a · LPLC2</b></div><div>Connectome<br><b>138,639 LIF</b></div><div>Steering<br><b>DNa01 · DNa02</b></div></div>
+      <div class="lr-head"><span></span><span><span class="legend-dot" style="background:var(--left)"></span>left</span><span><span class="legend-dot" style="background:var(--right)"></span>right</span></div>
+      <div class="bars" id="bars-in"></div>
+      <div class="bars" id="bars-out"></div>
+      <div>
+        <div class="label" style="margin-bottom:4px">Steering command</div>
+        <div class="steer"><span style="left:6px">◀ turn left</span><span style="right:6px">turn right ▶</span><i id="steer"></i></div>
+      </div>
+      <div class="bars" id="bars-extra"></div>
+
+      <h2>Settings</h2>
+      <div class="settings">
+        <div class="row"><label for="see">Goal visible through walls</label><input type="checkbox" id="see"></div>
+        <div class="row"><label for="speed">Walking speed <span class="mono" id="speed-v"></span></label><input type="range" id="speed" min="4" max="25" step="1" value="12"></div>
+        <div class="row"><label for="noise">Random wandering <span class="mono" id="noise-v"></span></label><input type="range" id="noise" min="0" max="150" step="5" value="40"></div>
+        <div class="row"><label for="maxs">Give up after (s)</label><input type="number" id="maxs" min="5" max="600" value="90"></div>
+        <div class="row"><label for="seed">Random seed</label><input type="number" id="seed" min="0" max="9999" value="0"></div>
+      </div>
+    </aside>
+  </div>
+
+  <section class="card how">
+    <h2>How the fly decides where to go</h2>
+    <p><b>Eyes (model).</b> When the goal is in view on the fly’s left, the left <span class="mono">LC10a</span> neurons fire (115 cells, the visual projection neurons flies use to track objects); the further off-centre it is, the faster they fire. Walls close to an eye loom, which drives that side’s <span class="mono">LPLC2</span> looming detectors.</p>
+    <p><b>Brain (connectome, not trained).</b> Those firing rates are fed into a leaky integrate-and-fire simulation of all 138,639 neurons and 15 million connections, using the parameters of Shiu et al. (<i>Nature</i> 2024). No weights are fitted. In this wiring diagram LC10a excites the <i>same-side</i> steering neuron DNa02, so the fly turns toward the goal. LPLC2 excites the <i>opposite-side</i> DNa01 and DNa02, so it turns away from a looming wall.</p>
+    <p><b>Legs (model).</b> The fly walks forward, turns at a rate set by left-minus-right activity of DNa01 + DNa02, and wanders a little at random. Each steering neuron is read relative to its own peak rate, measured once at start-up, because the reconstructed left DNa02 is about 4× more excitable than the right one. When the goal is hidden behind walls the fly has nothing to steer by except wall avoidance, so it wanders until it catches sight of the goal again.</p>
+  </section>
+</div>
+
+<script>
+// ---------------- state ----------------
+const CELL_MM = 2;
+const S = {
+  cols: 30, rows: 16, grid: [], start: [3, 3], goal: [25, 12], heading: 0,
+  tool: 'wall', presets: [], running: false, runId: 0, since: 0, frames: [],
+  meta: null, polling: null,
+};
+const $ = (s) => document.querySelector(s);
+const css = (v) => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+const cv = $('#arena'), ctx = cv.getContext('2d');
+
+function emptyGrid(c, r) {
+  return Array.from({ length: r }, (_, i) => Array.from({ length: c }, (_, j) => i === 0 || j === 0 || i === r - 1 || j === c - 1));
+}
+function fromRows(rows) {
+  S.rows = rows.length; S.cols = Math.max(...rows.map((r) => r.length));
+  S.grid = rows.map((r) => [...r.padEnd(S.cols, '.')].map((ch) => ch === '#'));
+  rows.forEach((r, i) => [...r].forEach((ch, j) => { if (ch === 'S') S.start = [j, i]; if (ch === 'G') S.goal = [j, i]; }));
+}
+function toRows() {
+  return S.grid.map((row, i) => row.map((w, j) => (S.start[0] === j && S.start[1] === i) ? 'S'
+    : (S.goal[0] === j && S.goal[1] === i) ? 'G' : w ? '#' : '.').join(''));
+}
+function save() { try { localStorage.setItem('fly-maze-map', JSON.stringify({ rows: toRows(), start_heading_deg: S.heading })); } catch (e) { /* storage unavailable */ } }
+
+// ---------------- drawing ----------------
+let cellPx = 24;
+function layout() {
+  const box = cv.parentElement.clientWidth;
+  cellPx = Math.max(8, Math.min(32, Math.floor(box / S.cols)));
+  const dpr = devicePixelRatio || 1;
+  cv.width = S.cols * cellPx * dpr; cv.height = S.rows * cellPx * dpr;
+  cv.style.width = S.cols * cellPx + 'px'; cv.style.height = S.rows * cellPx + 'px';
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  $('#cols').value = S.cols; $('#rows').value = S.rows;
+  $('#scale-note').textContent = `Arena ${S.cols * CELL_MM} × ${S.rows * CELL_MM} mm · one square = ${CELL_MM} mm (a fruit fly is about 2.5 mm long). Drag to draw walls; click to place the start or goal.`;
+}
+const mm = (v) => v / CELL_MM * cellPx;
+
+function draw() {
+  const w = S.cols * cellPx, h = S.rows * cellPx;
+  ctx.fillStyle = css('--floor'); ctx.fillRect(0, 0, w, h);
+  ctx.strokeStyle = css('--grid'); ctx.lineWidth = 1;
+  ctx.beginPath();
+  for (let j = 0; j <= S.cols; j++) { ctx.moveTo(j * cellPx + .5, 0); ctx.lineTo(j * cellPx + .5, h); }
+  for (let i = 0; i <= S.rows; i++) { ctx.moveTo(0, i * cellPx + .5); ctx.lineTo(w, i * cellPx + .5); }
+  ctx.stroke();
+  ctx.fillStyle = css('--wall');
+  S.grid.forEach((row, i) => row.forEach((wall, j) => { if (wall) ctx.fillRect(j * cellPx, i * cellPx, cellPx, cellPx); }));
+  // goal
+  const gx = (S.goal[0] + .5) * cellPx, gy = (S.goal[1] + .5) * cellPx;
+  ctx.fillStyle = css('--goal');
+  ctx.globalAlpha = .18; ctx.beginPath(); ctx.arc(gx, gy, mm(3), 0, 7); ctx.fill(); ctx.globalAlpha = 1;
+  ctx.beginPath(); ctx.arc(gx, gy, cellPx * .32, 0, 7); ctx.fill();
+  ctx.fillStyle = css('--surface'); ctx.beginPath(); ctx.arc(gx, gy, cellPx * .13, 0, 7); ctx.fill();
+  // start
+  const sx = (S.start[0] + .5) * cellPx, sy = (S.start[1] + .5) * cellPx, a = S.heading * Math.PI / 180;
+  ctx.strokeStyle = css('--muted'); ctx.lineWidth = 2; ctx.setLineDash([3, 3]);
+  ctx.strokeRect(S.start[0] * cellPx + 3, S.start[1] * cellPx + 3, cellPx - 6, cellPx - 6); ctx.setLineDash([]);
+  ctx.beginPath(); ctx.moveTo(sx, sy); ctx.lineTo(sx + Math.cos(a) * cellPx * .7, sy + Math.sin(a) * cellPx * .7); ctx.stroke();
+
+  const f = S.frames[S.frames.length - 1];
+  if (!f) return;
+  // trail
+  ctx.strokeStyle = css('--trail'); ctx.globalAlpha = .55; ctx.lineWidth = 2; ctx.lineJoin = 'round';
+  ctx.beginPath(); S.frames.forEach((p, k) => { const X = mm(p.x), Y = mm(p.y); k ? ctx.lineTo(X, Y) : ctx.moveTo(X, Y); }); ctx.stroke();
+  ctx.globalAlpha = 1;
+  const X = mm(f.x), Y = mm(f.y), hd = f.heading_deg * Math.PI / 180;
+  // sight line to goal
+  if (f.goal_visible) {
+    ctx.strokeStyle = css('--goal'); ctx.globalAlpha = .5; ctx.lineWidth = 1; ctx.setLineDash([4, 4]);
+    ctx.beginPath(); ctx.moveTo(X, Y); ctx.lineTo(gx, gy); ctx.stroke(); ctx.setLineDash([]); ctx.globalAlpha = 1;
+  }
+  // wall-looming feelers: left side = heading - angle (screen y points down)
+  [['--left', -1, f.inputs_hz.LPLC2_L], ['--right', 1, f.inputs_hz.LPLC2_R]].forEach(([col, sgn, rate]) => {
+    if (rate <= 0) return;
+    ctx.strokeStyle = css(col); ctx.globalAlpha = Math.min(.9, .2 + rate / 100); ctx.lineWidth = 2;
+    const ang = hd + sgn * 40 * Math.PI / 180;
+    ctx.beginPath(); ctx.arc(X, Y, mm(2.4), ang - .5, ang + .5); ctx.stroke(); ctx.globalAlpha = 1;
+  });
+  drawFly(X, Y, hd);
+}
+function drawFly(X, Y, hd) {
+  const L = mm(2.5), Wd = mm(1.0);
+  ctx.save(); ctx.translate(X, Y); ctx.rotate(hd);
+  ctx.fillStyle = css('--ink-2'); ctx.globalAlpha = .35;           // wings
+  ctx.beginPath(); ctx.ellipse(-L * .2, -Wd * .55, L * .42, Wd * .38, -.35, 0, 7); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(-L * .2, Wd * .55, L * .42, Wd * .38, .35, 0, 7); ctx.fill();
+  ctx.globalAlpha = 1; ctx.fillStyle = css('--ink');                 // body
+  ctx.beginPath(); ctx.ellipse(-L * .12, 0, L * .38, Wd * .42, 0, 0, 7); ctx.fill();
+  ctx.beginPath(); ctx.arc(L * .3, 0, Wd * .38, 0, 7); ctx.fill();   // head
+  ctx.fillStyle = '#c0392b';                                       // eyes
+  ctx.beginPath(); ctx.arc(L * .34, -Wd * .26, Wd * .17, 0, 7); ctx.arc(L * .34, Wd * .26, Wd * .17, 0, 7); ctx.fill();
+  ctx.restore();
+}
+
+// ---------------- editing ----------------
+let painting = null;
+function cellAt(ev) {
+  const r = cv.getBoundingClientRect();
+  return [Math.floor((ev.clientX - r.left) / cellPx), Math.floor((ev.clientY - r.top) / cellPx)];
+}
+function apply(j, i) {
+  if (i < 0 || j < 0 || i >= S.rows || j >= S.cols) return;
+  const occupied = (p) => p[0] === j && p[1] === i;
+  if (S.tool === 'wall' && !occupied(S.start) && !occupied(S.goal)) S.grid[i][j] = true;
+  if (S.tool === 'erase') S.grid[i][j] = false;
+  if (S.tool === 'start' && !occupied(S.goal)) { S.start = [j, i]; S.grid[i][j] = false; }
+  if (S.tool === 'goal' && !occupied(S.start)) { S.goal = [j, i]; S.grid[i][j] = false; }
+}
+cv.addEventListener('pointerdown', (ev) => {
+  if (S.running) return;
+  S.frames = []; painting = true; cv.setPointerCapture(ev.pointerId);
+  apply(...cellAt(ev)); draw();
+});
+cv.addEventListener('pointermove', (ev) => {
+  if (!painting || !['wall', 'erase'].includes(S.tool)) return;
+  apply(...cellAt(ev)); draw();
+});
+addEventListener('pointerup', () => { if (painting) { painting = null; save(); } });
+
+document.querySelectorAll('#tools button').forEach((b) => b.addEventListener('click', () => {
+  S.tool = b.dataset.tool;
+  document.querySelectorAll('#tools button').forEach((x) => x.setAttribute('aria-pressed', x === b));
+}));
+$('#heading').addEventListener('change', (e) => { S.heading = +e.target.value; save(); draw(); });
+$('#clear-btn').addEventListener('click', () => { S.grid = emptyGrid(S.cols, S.rows); S.frames = []; clampMarkers(); save(); draw(); });
+$('#resize-btn').addEventListener('click', () => {
+  const c = Math.max(8, Math.min(80, +$('#cols').value || S.cols)), r = Math.max(6, Math.min(80, +$('#rows').value || S.rows));
+  const g = emptyGrid(c, r);
+  for (let i = 1; i < Math.min(r, S.rows) - 1; i++) for (let j = 1; j < Math.min(c, S.cols) - 1; j++) g[i][j] = S.grid[i][j];
+  S.cols = c; S.rows = r; S.grid = g; S.frames = []; clampMarkers(); layout(); save(); draw();
+});
+function clampMarkers() {
+  const cl = (p) => [Math.min(Math.max(1, p[0]), S.cols - 2), Math.min(Math.max(1, p[1]), S.rows - 2)];
+  S.start = cl(S.start); S.goal = cl(S.goal);
+  S.grid[S.start[1]][S.start[0]] = false; S.grid[S.goal[1]][S.goal[0]] = false;
+}
+$('#preset').addEventListener('change', (e) => {
+  const p = S.presets.find((x) => x.id === e.target.value); if (!p) return;
+  loadMap(p);
+});
+function loadMap(d) {
+  fromRows(d.rows); S.heading = ((+d.start_heading_deg || 0) % 360 + 360) % 360;
+  $('#heading').value = String([0, 90, 180, 270].reduce((a, b) => Math.abs(b - S.heading) < Math.abs(a - S.heading) ? b : a));
+  S.heading = +$('#heading').value; S.frames = []; layout(); save(); draw();
+}
+
+// Random maze: corridors 2 cells wide, walls 1 cell thick.
+$('#maze-btn').addEventListener('click', () => {
+  const mc = Math.max(3, Math.floor((S.cols - 1) / 3)), mr = Math.max(2, Math.floor((S.rows - 1) / 3));
+  const C = mc * 3 + 1, R = mr * 3 + 1;
+  const g = Array.from({ length: R }, () => Array(C).fill(true));
+  const seen = Array.from({ length: mr }, () => Array(mc).fill(false));
+  const carve = (ci, cj) => { for (let a = 0; a < 2; a++) for (let b = 0; b < 2; b++) g[ci * 3 + 1 + a][cj * 3 + 1 + b] = false; };
+  const stack = [[0, 0]]; seen[0][0] = true; carve(0, 0);
+  while (stack.length) {
+    const [i, j] = stack[stack.length - 1];
+    const nb = [[0, 1], [1, 0], [0, -1], [-1, 0]].map(([di, dj]) => [i + di, j + dj, di, dj])
+      .filter(([a, b]) => a >= 0 && b >= 0 && a < mr && b < mc && !seen[a][b]);
+    if (!nb.length) { stack.pop(); continue; }
+    const [a, b, di, dj] = nb[Math.floor(Math.random() * nb.length)];
+    seen[a][b] = true; carve(a, b);
+    for (let k = 0; k < 2; k++) {
+      if (di) g[i * 3 + 1 + (di > 0 ? 2 : -1)][j * 3 + 1 + k] = false;
+      else g[i * 3 + 1 + k][j * 3 + 1 + (dj > 0 ? 2 : -1)] = false;
+    }
+    stack.push([a, b]);
+  }
+  // knock out a few extra walls so there are loops (easier for a fly with no map)
+  for (let n = 0; n < mc * mr / 4; n++) {
+    const i = 1 + Math.floor(Math.random() * (R - 2)), j = 1 + Math.floor(Math.random() * (C - 2));
+    if ((i % 3 === 0) !== (j % 3 === 0)) g[i][j] = false;
+  }
+  S.cols = C; S.rows = R; S.grid = g; S.start = [1, 1]; S.goal = [C - 3, R - 3]; S.heading = 0;
+  $('#heading').value = '0'; $('#preset').value = ''; S.frames = []; layout(); save(); draw();
+});
+
+$('#export-btn').addEventListener('click', () => {
+  const blob = new Blob([JSON.stringify({ name: 'My map', start_heading_deg: S.heading, rows: toRows() }, null, 1)], { type: 'application/json' });
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'fly-map.json'; a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+});
+$('#import-file').addEventListener('change', async (e) => {
+  const file = e.target.files[0]; if (!file) return;
+  try { const d = JSON.parse(await file.text()); if (!Array.isArray(d.rows)) throw new Error('no "rows" list'); loadMap(d); }
+  catch (err) { showError(`Could not load that file: ${err.message}. A map file is JSON with a "rows" list of strings using # . S G.`); }
+  e.target.value = '';
+});
+
+// ---------------- brain readout ----------------
+const BARS_IN = [['LC10a', 'goal in view', 80], ['LPLC2', 'wall looming', 100]];
+const BARS_OUT = [['DNa01', 'steering', 30], ['DNa02', 'steering', 90]];
+const BARS_EXTRA = [['GF', 'giant fiber · escape', 150], ['P9', 'forward walking', 50], ['MDN', 'backward walking', 50]];
+function barsHTML(list) {
+  return list.map(([n, d]) => `<div class="bar"><span class="name">${n}<small>${d}</small></span>
+    <span class="track l" id="b-${n}-L"><i></i><b></b></span><span class="track r" id="b-${n}-R"><i></i><b></b></span></div>`).join('');
+}
+$('#bars-in').innerHTML = barsHTML(BARS_IN); $('#bars-out').innerHTML = barsHTML(BARS_OUT); $('#bars-extra').innerHTML = barsHTML(BARS_EXTRA);
+function setBar(n, side, v, max) {
+  const el = $(`#b-${n}-${side}`); if (!el) return;
+  el.querySelector('i').style.width = Math.min(100, v / max * 100) + '%';
+  el.querySelector('b').textContent = v >= 0.5 ? Math.round(v) + ' Hz' : '';
+}
+function readout(f) {
+  BARS_IN.forEach(([n, , m]) => ['L', 'R'].forEach((s) => setBar(n, s, f ? f.inputs_hz[`${n}_${s}`] : 0, m)));
+  [...BARS_OUT, ...BARS_EXTRA].forEach(([n, , m]) => ['L', 'R'].forEach((s) => setBar(n, s, f ? f.dn_hz[`${n}_${s}`] : 0, m)));
+  $('#steer').style.left = `calc(${50 - Math.max(-1, Math.min(1, (f ? f.steer : 0) / 1.5)) * 48}% - 1px)`;
+  $('#st-time').textContent = f ? (f.t_ms / 1000).toFixed(1) + ' s' : '0.0 s';
+  $('#st-dist').textContent = f ? f.goal_dist_mm.toFixed(1) + ' mm' : '–';
+  $('#st-active').textContent = f ? f.active_neurons.toLocaleString() : '–';
+  $('#st-ratio').textContent = f && f.wall_s > 0 ? (f.t_ms / 1000 / f.wall_s).toFixed(2) + '×' : '–';
+}
+
+// ---------------- running ----------------
+function setStatus(s, text) { const p = $('#status'); p.dataset.s = s; p.textContent = text; }
+function showError(msg) { const e = $('#error'); e.textContent = msg; e.hidden = !msg; }
+$('#speed').addEventListener('input', (e) => { $('#speed-v').textContent = e.target.value + ' mm/s'; });
+$('#noise').addEventListener('input', (e) => { $('#noise-v').textContent = e.target.value + '°/√s'; });
+$('#speed').dispatchEvent(new Event('input')); $('#noise').dispatchEvent(new Event('input'));
+
+$('#run-btn').addEventListener('click', async () => {
+  if (S.running) { await fetch('/api/stop', { method: 'POST' }); return; }
+  showError('');
+  const body = { rows: toRows(), start_heading_deg: S.heading, settings: {
+    see_through_walls: $('#see').checked, speed_mm_s: +$('#speed').value, noise_deg_s: +$('#noise').value,
+    max_s: +$('#maxs').value || 90, seed: +$('#seed').value || 0 } };
+  try {
+    const r = await fetch('/api/run', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.error || r.statusText);
+    S.runId = d.run_id; S.since = 0; S.frames = []; S.running = true;
+    $('#run-btn').textContent = 'Stop'; $('#run-btn').classList.add('stop');
+    setStatus('running', 'Running…'); poll();
+  } catch (err) { showError(`Could not start the run: ${err.message}`); }
+});
+async function poll() {
+  try {
+    const r = await fetch(`/api/frames?run=${S.runId}&since=${S.since}`);
+    const d = await r.json();
+    if (d.frames.length) { S.frames.push(...d.frames); S.since += d.frames.length; }
+    const f = S.frames[S.frames.length - 1];
+    readout(f); draw();
+    if (d.status === 'running') {
+      setStatus('running', f ? (f.goal_visible ? 'Goal in sight, steering' : 'Searching, goal hidden') : 'Starting the brain…');
+      setTimeout(poll, 120); return;
+    }
+    S.running = false; $('#run-btn').textContent = 'Run fly'; $('#run-btn').classList.remove('stop');
+    if (d.status === 'reached') setStatus('reached', `Reached the goal in ${(f.t_ms / 1000).toFixed(1)} s`);
+    else if (d.status === 'timeout') setStatus('timeout', 'Gave up: time limit reached');
+    else if (d.status === 'stopped') setStatus('stopped', 'Stopped');
+    else if (d.status === 'error') { setStatus('error', 'Error'); showError(`The simulation stopped with an error: ${d.error}`); }
+  } catch (err) {
+    S.running = false; $('#run-btn').textContent = 'Run fly'; $('#run-btn').classList.remove('stop');
+    setStatus('error', 'Disconnected'); showError('Lost contact with the brain server. Is python navigate/server.py still running?');
+  }
+}
+
+// ---------------- boot ----------------
+async function boot() {
+  let saved = null;
+  try { saved = JSON.parse(localStorage.getItem('fly-maze-map')); } catch (e) { /* ignore */ }
+  try {
+    const info = await (await fetch('/api/info')).json();
+    S.presets = info.presets;
+    $('#preset').innerHTML = '<option value="">Custom</option>' + info.presets.map((p) => `<option value="${p.id}">${p.name}</option>`).join('');
+    $('#server-note').textContent = `Brain loaded: ${info.neurons.toLocaleString()} neurons · ${info.inputs.LC10a_L + info.inputs.LC10a_R} LC10a, ${info.inputs.LPLC2_L + info.inputs.LPLC2_R} LPLC2 inputs`;
+    $('#run-btn').disabled = false;
+    if (saved && saved.rows) loadMap(saved); else if (info.presets.length) { $('#preset').value = info.presets[0].id; loadMap(info.presets[0]); }
+  } catch (err) {
+    $('#server-note').textContent = 'Brain server not reachable';
+    showError('Start the brain server with: python navigate/server.py, then reload this page.');
+    S.grid = emptyGrid(S.cols, S.rows); layout(); draw();
+  }
+  readout(null);
+}
+addEventListener('resize', () => { layout(); draw(); });
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change', draw);
+boot();
+</script>
+</body>
+</html>

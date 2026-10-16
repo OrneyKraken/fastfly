@@ -1,0 +1,90 @@
+modality,sources,target,target_size,hops,neurons
+mechanosensory,2655,whole brain,138639,0,2655
+mechanosensory,2655,whole brain,138639,1,1717
+mechanosensory,2655,whole brain,138639,2,11835
+mechanosensory,2655,whole brain,138639,3,68598
+mechanosensory,2655,whole brain,138639,4,35902
+mechanosensory,2655,whole brain,138639,5,3771
+mechanosensory,2655,whole brain,138639,6,526
+mechanosensory,2655,whole brain,138639,7,36
+mechanosensory,2655,whole brain,138639,8,9
+mechanosensory,2655,whole brain,138639,9,1
+mechanosensory,2655,descending,1299,0,0
+mechanosensory,2655,descending,1299,1,261
+mechanosensory,2655,descending,1299,2,749
+mechanosensory,2655,descending,1299,3,223
+mechanosensory,2655,descending,1299,4,22
+mechanosensory,2655,descending,1299,5,1
+mechanosensory,2655,motor,110,0,0
+mechanosensory,2655,motor,110,1,33
+mechanosensory,2655,motor,110,2,69
+mechanosensory,2655,motor,110,3,6
+mechanosensory,2655,motor,110,4,1
+gustatory,336,whole brain,138639,0,336
+gustatory,336,whole brain,138639,1,643
+gustatory,336,whole brain,138639,2,6108
+gustatory,336,whole brain,138639,3,24435
+gustatory,336,whole brain,138639,4,48458
+gustatory,336,whole brain,138639,5,39437
+gustatory,336,whole brain,138639,6,4147
+gustatory,336,whole brain,138639,7,467
+gustatory,336,whole brain,138639,8,44
+gustatory,336,whole brain,138639,9,8
+gustatory,336,whole brain,138639,10,1
+gustatory,336,descending,1299,0,0
+gustatory,336,descending,1299,1,29
+gustatory,336,descending,1299,2,341
+gustatory,336,descending,1299,3,579
+gustatory,336,descending,1299,4,280
+gustatory,336,descending,1299,5,26
+gustatory,336,descending,1299,6,1
+gustatory,336,motor,110,0,0
+gustatory,336,motor,110,1,2
+gustatory,336,motor,110,2,76
+gustatory,336,motor,110,3,29
+gustatory,336,motor,110,4,2
+olfactory,2279,whole brain,138639,0,2279
+olfactory,2279,whole brain,138639,1,542
+olfactory,2279,whole brain,138639,2,9813
+olfactory,2279,whole brain,138639,3,29788
+olfactory,2279,whole brain,138639,4,57876
+olfactory,2279,whole brain,138639,5,21189
+olfactory,2279,whole brain,138639,6,2881
+olfactory,2279,whole brain,138639,7,322
+olfactory,2279,whole brain,138639,8,37
+olfactory,2279,whole brain,138639,9,3
+olfactory,2279,descending,1299,0,0
+olfactory,2279,descending,1299,1,1
+olfactory,2279,descending,1299,2,111
+olfactory,2279,descending,1299,3,753
+olfactory,2279,descending,1299,4,355
+olfactory,2279,descending,1299,5,34
+olfactory,2279,descending,1299,6,2
+olfactory,2279,motor,110,0,0
+olfactory,2279,motor,110,1,0
+olfactory,2279,motor,110,2,1
+olfactory,2279,motor,110,3,61
+olfactory,2279,motor,110,4,47
+visual,10855,whole brain,138639,0,10855
+visual,10855,whole brain,138639,1,6808
+visual,10855,whole brain,138639,2,34427
+visual,10855,whole brain,138639,3,52430
+visual,10855,whole brain,138639,4,24670
+visual,10855,whole brain,138639,5,4257
+visual,10855,whole brain,138639,6,223
+visual,10855,whole brain,138639,7,29
+visual,10855,whole brain,138639,8,6
+visual,10855,descending,1299,0,0
+visual,10855,descending,1299,1,2
+visual,10855,descending,1299,2,94
+visual,10855,descending,1299,3,703
+visual,10855,descending,1299,4,407
+visual,10855,descending,1299,5,47
+visual,10855,descending,1299,6,2
+visual,10855,descending,1299,7,1
+visual,10855,motor,110,0,0
+visual,10855,motor,110,1,0
+visual,10855,motor,110,2,8
+visual,10855,motor,110,3,37
+visual,10855,motor,110,4,54
+visual,10855,motor,110,5,10

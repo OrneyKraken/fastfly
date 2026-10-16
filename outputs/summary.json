@@ -1,0 +1,16 @@
+{
+  "neurons": 138639,
+  "connections": 15091983,
+  "synapses": 54492922,
+  "strong_connections": 2700513,
+  "excitatory_synapse_frac": 0.5963107832609894,
+  "cell_types": 8845,
+  "median_partners_out": 79.0,
+  "median_partners_in": 69.0,
+  "max_synapses_one_connection": 2405,
+  "strong_reciprocity": 0.13976899944566087,
+  "strong_density": 0.0001405007267023154,
+  "reciprocity_enrichment": 994.7920037580669,
+  "symmetry_r": 0.8368505139356244,
+  "symmetry_pairs": 91425
+}
