@@ -1,4 +1,4 @@
-# Fly Connectome Atlas
+# FastFly: Fly Connectome Atlas
 
 A graph analysis of the complete wiring diagram of an adult fruit-fly brain:
 **138,639 neurons** and **54.5 million synapses** from the
